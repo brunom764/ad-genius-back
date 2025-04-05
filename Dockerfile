@@ -3,6 +3,7 @@
 ###################
 
 FROM node:20-alpine AS build
+
 RUN apk add --no-cache openssl libc6-compat
 
 WORKDIR /usr/src/adgeniusback
@@ -12,18 +13,15 @@ COPY --chown=node:node yarn.lock ./
 
 RUN npm pkg delete scripts.prepare
 
-RUN yarn
-
-COPY --chown=node:node . .
-COPY --chown=node:node .env .env
-
+RUN apk add --no-cache openssl
+COPY --chown=node:node prisma ./prisma
 RUN npx prisma generate
+
+RUN yarn
+COPY --chown=node:node . .
 RUN npm run build
 
-RUN npm pkg delete scripts.prepare
-
 ENV NODE_ENV=production
-
 RUN yarn install --prod
 
 USER node
@@ -34,14 +32,13 @@ USER node
 
 FROM node:20-alpine AS production
 
-RUN apk add --no-cache openssl libc6-compat
+WORKDIR /usr/src/adgeniusback
+
+RUN apk add --no-cache openssl
 
 COPY --chown=node:node --from=build /usr/src/adgeniusback/node_modules ./node_modules
 COPY --chown=node:node --from=build /usr/src/adgeniusback/dist ./dist
-COPY --chown=node:node ./prisma ./prisma
-COPY --chown=node:node .env .env
-
-RUN npx prisma generate
+COPY --chown=node:node --from=build /usr/src/adgeniusback/prisma ./prisma
 
 RUN npm install pm2 -g
 
